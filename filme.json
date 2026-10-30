@@ -1,1 +1,13 @@
-
+{
+  "title": "A Última Sessão",
+  "poster": "poster.png",
+  "genero": "Drama, Suspense",
+  "snopse": "Numa cidade pequena, o último cinema de rua está prestes a fechar. Na noite da sessão de despedida, o projecionista descobre uma bobina esquecida que mostra cenas que ninguém se lembra de ter filmado.\n\nÀ medida que a plateia assiste, cada espectador começa a reconhecer o próprio rosto na tela — e a perceber que o filme ainda não terminou.",
+  "filme": [0, "filme.mp4"],
+  "download": ["Baixar o filme", "https://exemplo.com/download"],
+  "sidebar": [
+    { "icon": "trailer.png", "hover": "Trailer", "link": "https://exemplo.com/trailer" },
+    { "icon": "estrela.png", "hover": "Avaliações", "link": "https://exemplo.com/avaliacoes" },
+    { "icon": "chat.png", "hover": "", "link": "https://exemplo.com/comunidade" }
+  ]
+}
