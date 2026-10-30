@@ -1,0 +1,556 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Filme</title>
+<meta name="description" content="">
+<meta name="theme-color" content="#0c0b0d">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,800&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+
+<style>
+:root{
+  --bg:#0c0b0d;
+  --ink:#f3eee6;
+  --text:#d8d2c8;
+  --muted:#a39d94;
+  --line:rgba(255,255,255,.11);
+  --glass:rgba(255,255,255,.06);
+  --accent:#ff5b3a;
+  --accent-hi:#ff7a5e;
+  --accent-ink:#1c0803;
+  --serif:"Fraunces",Georgia,"Times New Roman",serif;
+  --sans:"Instrument Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --rail:64px;
+  --gap:clamp(18px,3vw,36px);
+}
+*{box-sizing:border-box;margin:0}
+[hidden]{display:none!important}
+html{color-scheme:dark}
+body{
+  min-height:100vh;background:var(--bg);color:var(--ink);
+  font-family:var(--sans);line-height:1.6;overflow-x:hidden;
+}
+
+/* fundo: o próprio pôster, desfocado */
+#ambient{
+  position:fixed;inset:-12%;z-index:-2;background-size:cover;background-position:center;
+  filter:blur(70px) saturate(1.5);opacity:0;transition:opacity 1.2s ease;
+}
+#ambient.on{opacity:.4}
+body::after{
+  content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
+  background:radial-gradient(ellipse 90% 70% at 50% 0%,transparent 0,var(--bg) 100%);
+}
+
+/* estados */
+.state{min-height:100vh;display:grid;place-items:center;padding:24px;text-align:center;color:var(--muted)}
+.state code{background:var(--glass);padding:2px 8px;border-radius:6px;color:var(--ink);font-size:.9em}
+.state p{max-width:46ch}
+.state strong{display:block;color:var(--ink);font-family:var(--serif);font-size:1.5rem;margin-bottom:8px}
+
+/* ---------- layout ----------
+   [ A A | B B B B | C ]
+   [ A A | B B B B | X ]
+   [ A A | D D D E | X ]
+   [ A A | F F F F | X ]
+   [ A A | F F F F | X ]
+   [ F F F F F F F | X ]
+   O pôster flutua à esquerda; a sinopse (F) contorna o pôster e, passando
+   da altura dele, ocupa a largura toda — o "L" do desenho. */
+.layout{
+  max-width:1120px;margin:0 auto;
+  padding:clamp(20px,5vw,64px) 16px;
+  display:grid;grid-template-columns:minmax(0,1fr) var(--rail);gap:var(--gap);
+}
+.layout.no-rail{grid-template-columns:minmax(0,1fr)}
+.content{display:flow-root}
+
+/* A — pôster */
+.poster{
+  float:left;width:32%;
+  margin:0 var(--gap) var(--gap) 0;
+  aspect-ratio:2/3;
+  border-radius:14px;
+  box-shadow:0 36px 70px -24px rgba(0,0,0,.9),0 0 0 1px var(--line);
+  background:var(--glass);
+}
+.poster-btn{
+  all:unset;display:block;position:relative;width:100%;height:100%;
+  border-radius:inherit;overflow:hidden;cursor:pointer;
+}
+.poster-btn:focus-visible{outline:3px solid var(--accent);outline-offset:3px}
+.poster.no-play .poster-btn{cursor:default;pointer-events:none}
+.poster img{width:100%;height:100%;object-fit:cover;display:block}
+.poster-fallback{
+  width:100%;height:100%;display:grid;place-items:center;padding:20px;text-align:center;
+  font-family:var(--serif);font-size:1.6rem;color:var(--muted);
+  background:linear-gradient(160deg,#241f22,#121014);
+}
+/* hover: ~0.5s escurece e mostra o play */
+.poster-btn::after{
+  content:"";position:absolute;inset:0;background:rgba(0,0,0,.62);
+  opacity:0;transition:opacity .5s ease;
+}
+.play{
+  position:absolute;inset:0;margin:auto;z-index:1;
+  width:78px;height:78px;border-radius:50%;
+  display:grid;place-items:center;
+  background:var(--ink);color:#141214;
+  opacity:0;transform:scale(.82);
+  transition:opacity .5s ease,transform .5s ease;
+  box-shadow:0 10px 30px rgba(0,0,0,.5);
+}
+.play svg{width:30px;height:30px;margin-left:4px}
+.poster:not(.no-play) .poster-btn:hover::after,
+.poster:not(.no-play) .poster-btn:focus-visible::after{opacity:1}
+.poster:not(.no-play) .poster-btn:hover .play,
+.poster:not(.no-play) .poster-btn:focus-visible .play{opacity:1;transform:scale(1)}
+@media (hover:none){ /* toque: não existe hover, deixa o play sempre visível */
+  .poster:not(.no-play) .poster-btn::after{opacity:.28}
+  .poster:not(.no-play) .play{opacity:.95;transform:scale(.8)}
+}
+
+/* B — título */
+h1{
+  font-family:var(--serif);font-weight:800;
+  font-size:clamp(2.1rem,5.4vw,4.5rem);line-height:1.02;letter-spacing:-.025em;
+  font-variation-settings:"opsz" 144;text-wrap:balance;
+}
+
+/* D + E — gêneros e duração */
+.meta{
+  display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;
+  gap:12px 24px;margin:clamp(14px,2vw,24px) 0;
+}
+.genres{display:flex;flex-wrap:wrap;gap:8px;list-style:none;padding:0}
+.genres li{
+  padding:5px 14px;border:1px solid var(--line);border-radius:99px;background:var(--glass);
+  font-size:.78rem;font-weight:500;letter-spacing:.09em;text-transform:uppercase;
+}
+.duration{
+  display:inline-flex;align-items:center;gap:8px;color:var(--muted);
+  font-variant-numeric:tabular-nums;font-weight:500;margin-left:auto;
+}
+.duration svg{width:16px;height:16px}
+
+/* F — sinopse */
+.synopsis{
+  color:var(--text);font-size:clamp(1rem,1.25vw,1.12rem);
+  white-space:pre-line;text-wrap:pretty;
+}
+
+/* X — barra lateral (C é o primeiro botão dela) */
+.rail{
+  display:flex;flex-direction:column;align-items:center;gap:10px;
+  padding:10px 0;border-radius:20px;
+  background:var(--glass);border:1px solid var(--line);
+  backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+}
+.rail .sep{width:24px;height:1px;background:var(--line);flex:none}
+.rbtn{
+  position:relative;flex:none;width:44px;height:44px;border-radius:14px;
+  display:grid;place-items:center;
+  color:var(--ink);background:rgba(255,255,255,.08);text-decoration:none;
+  font-size:1.25rem;line-height:1;
+  transition:transform .2s ease,background .2s ease;
+}
+a.rbtn:hover,a.rbtn:focus-visible{background:rgba(255,255,255,.18);transform:translateY(-2px)}
+a.rbtn:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.rbtn svg,.rbtn img{width:22px;height:22px;display:block;object-fit:contain}
+.rbtn.dl{background:var(--accent);color:var(--accent-ink)}
+a.rbtn.dl:hover,a.rbtn.dl:focus-visible{background:var(--accent-hi)}
+
+/* download sem barra lateral: botão flutuante */
+.fab{
+  position:fixed;z-index:50;
+  right:clamp(16px,3vw,32px);bottom:clamp(16px,3vw,32px);
+  width:60px;height:60px;border-radius:50%;
+  box-shadow:0 14px 34px -8px rgba(255,91,58,.55),0 6px 16px rgba(0,0,0,.5);
+}
+.fab svg{width:26px;height:26px}
+
+/* tooltip (só existe quando há data-tip) */
+[data-tip]::before{
+  content:attr(data-tip);position:absolute;z-index:30;
+  right:calc(100% + 12px);top:50%;transform:translate(6px,-50%);
+  white-space:nowrap;max-width:min(260px,70vw);overflow:hidden;text-overflow:ellipsis;
+  background:var(--ink);color:#141214;
+  font-size:.82rem;font-weight:600;line-height:1;padding:8px 11px;border-radius:9px;
+  opacity:0;pointer-events:none;transition:opacity .18s ease,transform .18s ease;
+}
+[data-tip]:hover::before,[data-tip]:focus-visible::before{opacity:1;transform:translate(0,-50%)}
+
+/* ---------- player em tela cheia ---------- */
+#player{position:fixed;inset:0;z-index:1000;background:#000;display:none}
+#player.open{display:block}
+#player video{display:block;width:100%;height:100%;object-fit:contain;background:#000;outline:none}
+.pbar{
+  position:absolute;top:0;left:0;right:0;z-index:2;
+  display:flex;align-items:center;gap:14px;padding:16px 18px 40px;
+  background:linear-gradient(rgba(0,0,0,.7),transparent);
+  transition:opacity .3s ease;pointer-events:none;
+}
+.pbar>*{pointer-events:auto}
+#close{
+  all:unset;cursor:pointer;width:44px;height:44px;border-radius:50%;
+  display:grid;place-items:center;color:#fff;background:rgba(255,255,255,.14);
+  transition:background .2s;
+}
+#close:hover,#close:focus-visible{background:rgba(255,255,255,.28)}
+#close svg{width:22px;height:22px}
+#ptitle{color:#fff;font-weight:600;text-shadow:0 1px 8px rgba(0,0,0,.6);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#player.idle .pbar{opacity:0;pointer-events:none}
+#player.idle{cursor:none}
+#perr{
+  position:absolute;inset:0;display:none;place-items:center;text-align:center;padding:24px;
+  color:#ddd;z-index:1;pointer-events:none;
+}
+#perr.on{display:grid}
+
+/* ---------- celular ---------- */
+@media (max-width:640px){
+  .layout{grid-template-columns:1fr;gap:20px}
+  .rail{order:-1;flex-direction:row;justify-content:flex-start;padding:8px 10px;overflow-x:auto}
+  .rail .sep{width:1px;height:24px}
+  .poster{float:none;width:min(72%,300px);margin:0 auto 26px}
+  .content{text-align:left}
+  [data-tip]::before{right:auto;left:50%;top:calc(100% + 10px);transform:translate(-50%,-6px)}
+  [data-tip]:hover::before,[data-tip]:focus-visible::before{transform:translate(-50%,0)}
+}
+</style>
+</head>
+
+<body>
+<div id="ambient"></div>
+
+<div id="state" class="state"><p>Carregando…</p></div>
+
+<main id="app" hidden>
+  <div class="layout" id="layout">
+    <article class="content">
+      <figure class="poster" id="poster">
+        <button class="poster-btn" id="posterBtn" type="button" aria-label="Assistir ao filme">
+          <span class="play" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15a1 1 0 0 0 1.52.85l12.2-7.5a1 1 0 0 0 0-1.7L8.52 3.65A1 1 0 0 0 7 4.5Z"/></svg>
+          </span>
+        </button>
+      </figure>
+
+      <h1 id="title"></h1>
+
+      <div class="meta" id="meta">
+        <ul class="genres" id="genres"></ul>
+        <span class="duration" id="duration" hidden>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+          <span id="durationText"></span>
+        </span>
+      </div>
+
+      <p class="synopsis" id="synopsis"></p>
+    </article>
+
+    <aside class="rail" id="rail" hidden></aside>
+  </div>
+</main>
+
+<!-- download sem sidebar -->
+<div id="fabSlot"></div>
+
+<!-- player -->
+<div id="player" role="dialog" aria-modal="true" aria-label="Player">
+  <video id="video" controls playsinline preload="metadata"></video>
+  <div id="perr"><p id="perrMsg"></p></div>
+  <div class="pbar">
+    <button id="close" type="button" aria-label="Fechar">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M11 18l-6-6 6-6"/></svg>
+    </button>
+    <span id="ptitle"></span>
+  </div>
+</div>
+
+<script>
+/* ============ configuração ============ */
+const CONFIG = {
+  json: "filme.json",      // arquivo de dados, ao lado do index.html
+  newTab: true             // links (download e sidebar) abrem em nova aba
+};
+
+/* ============ utilidades ============ */
+const $ = (id) => document.getElementById(id);
+const str = (v) => (v == null ? "" : String(v).trim());
+
+const ICON_DOWNLOAD = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12m0 0 5-5m-5 5-5-5M4 20h16"/></svg>';
+const ICON_LINK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg>';
+
+function showState(title, html) {
+  const s = $("state");
+  s.hidden = false;
+  s.innerHTML = "";
+  const p = document.createElement("p");
+  const strong = document.createElement("strong");
+  strong.textContent = title;
+  p.appendChild(strong);
+  const span = document.createElement("span");
+  span.innerHTML = html; // texto fixo escrito aqui, nunca vindo do JSON
+  p.appendChild(span);
+  s.appendChild(p);
+}
+
+/* "icon": nome de um arquivo de imagem junto do projeto ("trailer.png"),
+   ou [0,"arquivo.png"] / [1,"https://link/da/imagem.png"] como em "filme".
+   Se a imagem não existir, aparece um ícone de link no lugar. */
+function iconNode(icon) {
+  const src = Array.isArray(icon) ? str(icon[1]) : str(icon);
+  const fallback = () => { const w = document.createElement("span"); w.innerHTML = ICON_LINK; return w.firstChild; };
+  if (!src) return fallback();
+  const img = document.createElement("img");
+  img.alt = ""; img.decoding = "async";
+  img.onerror = () => img.replaceWith(fallback());
+  img.src = src;
+  return img;
+}
+
+function makeButton({ href, tip, icon, label, cls }) {
+  const el = document.createElement(href ? "a" : "span");
+  el.className = "rbtn" + (cls ? " " + cls : "");
+  if (href) {
+    el.href = href;
+    if (CONFIG.newTab) { el.target = "_blank"; el.rel = "noopener noreferrer"; }
+  } else {
+    el.setAttribute("aria-disabled", "true");
+  }
+  if (tip) el.dataset.tip = tip;              // sem texto → sem hover
+  el.setAttribute("aria-label", tip || label || href || "Link");
+  el.appendChild(icon);
+  return el;
+}
+
+/* ============ interpretação do JSON ============ */
+function parseGenres(g) {
+  const list = Array.isArray(g) ? g : [g]; // texto = um gênero só; lista = vários
+  return list.map(str).filter(Boolean);
+}
+
+function parseFilm(f) {
+  // [0,"arquivo.mp4"] = junto do projeto · [1,"https://..."] = link externo
+  let kind, src;
+  if (Array.isArray(f)) { kind = Number(f[0]); src = str(f[1]); }
+  else { src = str(f); kind = /^https?:\/\//i.test(src) ? 1 : 0; }
+  if (!src || (kind !== 0 && kind !== 1)) return null;
+  return src;
+}
+
+// download: "link" | ["link"] → sem hover · ["texto do hover","link"] → com hover
+function parseDownload(d) {
+  let tip = "", link = "";
+  if (Array.isArray(d)) {
+    if (d.length >= 2) { tip = str(d[0]); link = str(d[1]); }
+    else link = str(d[0]);
+  } else link = str(d);
+  return link ? { link, tip } : null;
+}
+
+function parseSidebar(list) {
+  if (!Array.isArray(list)) return [];
+  return list
+    .filter((o) => o && typeof o === "object" && !Array.isArray(o))
+    .map((o) => ({ icon: o.icon, tip: str(o.hover), link: str(o.link) }))
+    .filter((o) => o.link || str(o.icon));
+}
+
+function formatDuration(sec) {
+  if (!isFinite(sec) || sec <= 0) return "";
+  if (sec < 60) return Math.round(sec) + "s";
+  const total = Math.round(sec / 60), h = Math.floor(total / 60), m = total % 60;
+  if (!h) return m + "min";
+  return m ? `${h}h ${String(m).padStart(2, "0")}min` : `${h}h`;
+}
+
+/* ============ montagem da página ============ */
+async function init() {
+  let data;
+  try {
+    const ctl = new AbortController(); const to = setTimeout(() => ctl.abort(), 15000);
+    const r = await fetch(CONFIG.json, { cache: "no-cache", signal: ctl.signal }); clearTimeout(to);
+    if (!r.ok) throw new Error(r.status + " " + r.statusText);
+    data = await r.json();
+  } catch (e) {
+    const local = location.protocol === "file:";
+    showState("Não consegui carregar os dados",
+      local
+        ? `Você abriu o arquivo direto do disco, e o navegador bloqueia a leitura do <code>${CONFIG.json}</code> assim. Rode um servidor local (por exemplo <code>npx serve</code>) ou publique no Vercel.`
+        : `Confira se o <code>${CONFIG.json}</code> está na mesma pasta do <code>index.html</code> e se o JSON é válido.`);
+    return;
+  }
+  try { render(data || {}); }
+  catch (e) { showState("Erro ao montar a página", "Detalhe: <code></code>"); $("state").querySelector("code").textContent = e && e.message ? e.message : String(e); console.error(e); }
+}
+
+// qualquer erro de script que deixe a página em "Carregando…" vira uma mensagem visível
+window.addEventListener("error", (ev) => {
+  if ($("app").hidden) { showState("Erro no script", "Detalhe: <code></code>"); $("state").querySelector("code").textContent = ev.message || "desconhecido"; }
+});
+
+function render(d) {
+  const title = str(d.title) || "Sem título";
+  const synopsis = str(d.sinopse ?? d.snopse ?? d.sinopsis ?? d.synopsis);
+  const genres = parseGenres(d.genero ?? d.genre ?? d.generos);
+  const filmSrc = parseFilm(d.filme);
+  const download = parseDownload(d.download);
+  const sidebar = parseSidebar(d.sidebar);
+  const posterSrc = Array.isArray(d.poster) ? str(d.poster[1]) : str(d.poster);
+
+  document.title = title;
+  document.querySelector('meta[name="description"]').content = synopsis.slice(0, 200);
+  $("title").textContent = title;
+  $("ptitle").textContent = title;
+
+  /* D */
+  if (genres.length) {
+    genres.forEach((g) => { const li = document.createElement("li"); li.textContent = g; $("genres").appendChild(li); });
+  } else $("genres").hidden = true;
+
+  /* F */
+  if (synopsis) $("synopsis").textContent = synopsis; else $("synopsis").hidden = true;
+
+  /* A */
+  const posterEl = $("poster"), btn = $("posterBtn");
+  const img = new Image();
+  img.alt = "Pôster de " + title;
+  img.decoding = "async";
+  img.onload = () => {
+    posterEl.style.aspectRatio = img.naturalWidth + " / " + img.naturalHeight;
+    const amb = $("ambient");
+    amb.style.backgroundImage = 'url("' + img.src.replace(/"/g, "%22") + '")';
+    requestAnimationFrame(() => amb.classList.add("on"));
+  };
+  img.onerror = () => {
+    const fb = document.createElement("div");
+    fb.className = "poster-fallback"; fb.textContent = title;
+    img.replaceWith(fb);
+  };
+  btn.prepend(img);
+  if (posterSrc) img.src = posterSrc; else img.onerror();
+
+  /* E + vídeo (o mesmo <video> do player já carrega os metadados) */
+  const video = $("video");
+  if (filmSrc) {
+    video.addEventListener("loadedmetadata", () => {
+      const t = formatDuration(video.duration);
+      if (t) { $("durationText").textContent = t; $("duration").hidden = false; }
+    }, { once: true });
+    video.src = filmSrc;
+    btn.addEventListener("click", openPlayer);
+  } else {
+    posterEl.classList.add("no-play");
+    btn.disabled = true;
+  }
+
+  /* C + X */
+  const rail = $("rail"), layout = $("layout");
+  const dlBtn = download && makeButton({
+    href: download.link, tip: download.tip, icon: (() => { const w = document.createElement("span"); w.innerHTML = ICON_DOWNLOAD; return w.firstChild; })(),
+    label: "Baixar", cls: "dl"
+  });
+
+  if (sidebar.length) {
+    if (dlBtn) { rail.appendChild(dlBtn); const sep = document.createElement("i"); sep.className = "sep"; rail.appendChild(sep); }
+    sidebar.forEach((s) => rail.appendChild(makeButton({ href: s.link, tip: s.tip, icon: iconNode(s.icon), label: "Link" })));
+    rail.hidden = false;
+  } else {
+    layout.classList.add("no-rail");           // sem barra lateral…
+    if (dlBtn) { dlBtn.classList.add("fab"); $("fabSlot").appendChild(dlBtn); }   // …download vira botão flutuante
+  }
+
+  $("state").hidden = true;
+  $("app").hidden = false;
+}
+
+/* ============ player ============ */
+const player = $("player"), video = $("video");
+let idleTimer = null;
+
+const fsElement = () => document.fullscreenElement || document.webkitFullscreenElement;
+const isOpen = () => player.classList.contains("open");
+
+function wake() {
+  player.classList.remove("idle");
+  clearTimeout(idleTimer);
+  if (!video.paused) idleTimer = setTimeout(() => player.classList.add("idle"), 2800);
+}
+
+function openPlayer() {
+  $("perr").classList.remove("on");
+  player.classList.add("open");
+  watchLoading();
+  if (video.error) perr("Não foi possível carregar o vídeo. Confira o nome ou o link em \"filme\" no JSON.");
+  document.documentElement.style.overflow = "hidden";
+  try {
+    const p = player.requestFullscreen ? player.requestFullscreen() : (player.webkitRequestFullscreen && player.webkitRequestFullscreen());
+    if (p && p.catch) p.catch(() => {});
+  } catch (e) {}
+  const pl = video.play();
+  if (pl && pl.catch) pl.catch(() => {});   // se o navegador barrar o autoplay, os controles continuam ali
+  wake();
+}
+
+function closePlayer() {
+  if (!isOpen()) return;
+  video.pause();
+  player.classList.remove("open", "idle");
+  document.documentElement.style.overflow = "";
+  clearTimeout(idleTimer);
+  if (fsElement()) {
+    const p = document.exitFullscreen ? document.exitFullscreen() : (document.webkitExitFullscreen && document.webkitExitFullscreen());
+    if (p && p.catch) p.catch(() => {});
+  }
+  $("posterBtn").focus({ preventScroll: true });
+}
+
+$("close").addEventListener("click", closePlayer);
+["fullscreenchange", "webkitfullscreenchange"].forEach((ev) =>
+  document.addEventListener(ev, () => { if (isOpen() && !fsElement()) closePlayer(); }));
+["mousemove", "pointerdown", "touchstart"].forEach((ev) => player.addEventListener(ev, wake, { passive: true }));
+video.addEventListener("pause", wake);
+video.addEventListener("play", wake);
+/* timeout do vídeo: se ficar travado carregando por mais de 20s, avisa em vez de girar para sempre */
+const VIDEO_TIMEOUT_MS = 20000;
+let loadTimer = null;
+function perr(msg) {
+  $("perrMsg").textContent = msg;
+  $("perr").classList.add("on");
+  player.classList.remove("idle");
+}
+function watchLoading() {
+  clearTimeout(loadTimer);
+  if (video.readyState >= 3) return;
+  loadTimer = setTimeout(() => {
+    if (isOpen() && video.readyState < 3) perr("O vídeo está demorando demais para carregar. Verifique a conexão ou o link em \"filme\" no JSON.");
+  }, VIDEO_TIMEOUT_MS);
+}
+["waiting", "stalled", "loadstart"].forEach((ev) => video.addEventListener(ev, () => { if (isOpen()) watchLoading(); }));
+["playing", "canplay"].forEach((ev) => video.addEventListener(ev, () => { clearTimeout(loadTimer); $("perr").classList.remove("on"); }));
+video.addEventListener("error", () => { if (isOpen()) perr("Não foi possível carregar o vídeo. Confira o nome ou o link em \"filme\" no JSON."); });
+
+document.addEventListener("keydown", (e) => {
+  if (!isOpen()) return;
+  const k = e.key;
+  const handled = () => { e.preventDefault(); e.stopPropagation(); wake(); };
+  if (k === "Escape") { handled(); closePlayer(); }
+  else if (k === " " || k === "k" || k === "K") { handled(); video.paused ? video.play().catch(() => {}) : video.pause(); }
+  else if (k === "ArrowRight") { handled(); video.currentTime = Math.min(video.duration || Infinity, video.currentTime + 5); }
+  else if (k === "ArrowLeft") { handled(); video.currentTime = Math.max(0, video.currentTime - 5); }
+  else if (k === "f" || k === "F") {
+    handled();
+    if (fsElement()) document.exitFullscreen && document.exitFullscreen().catch(() => {});
+    else player.requestFullscreen && player.requestFullscreen().catch(() => {});
+  }
+}, true);
+
+init();
+</script>
+</body>
+</html>
