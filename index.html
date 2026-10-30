@@ -262,7 +262,7 @@ a.rbtn.dl:hover,a.rbtn.dl:focus-visible{background:var(--accent-hi)}
 <!-- player -->
 <div id="player" role="dialog" aria-modal="true" aria-label="Player">
   <video id="video" controls playsinline preload="metadata"></video>
-  <div id="perr"><p>Não foi possível carregar o vídeo.<br>Confira o nome/link em <code>"filme"</code> no JSON.</p></div>
+  <div id="perr"><p id="perrMsg"></p></div>
   <div class="pbar">
     <button id="close" type="button" aria-label="Fechar">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M11 18l-6-6 6-6"/></svg>
@@ -373,7 +373,8 @@ function formatDuration(sec) {
 async function init() {
   let data;
   try {
-    const r = await fetch(CONFIG.json, { cache: "no-cache" });
+    const ctl = new AbortController(); const to = setTimeout(() => ctl.abort(), 15000);
+    const r = await fetch(CONFIG.json, { cache: "no-cache", signal: ctl.signal }); clearTimeout(to);
     if (!r.ok) throw new Error(r.status + " " + r.statusText);
     data = await r.json();
   } catch (e) {
@@ -384,8 +385,14 @@ async function init() {
         : `Confira se o <code>${CONFIG.json}</code> está na mesma pasta do <code>index.html</code> e se o JSON é válido.`);
     return;
   }
-  render(data || {});
+  try { render(data || {}); }
+  catch (e) { showState("Erro ao montar a página", "Detalhe: <code></code>"); $("state").querySelector("code").textContent = e && e.message ? e.message : String(e); console.error(e); }
 }
+
+// qualquer erro de script que deixe a página em "Carregando…" vira uma mensagem visível
+window.addEventListener("error", (ev) => {
+  if ($("app").hidden) { showState("Erro no script", "Detalhe: <code></code>"); $("state").querySelector("code").textContent = ev.message || "desconhecido"; }
+});
 
 function render(d) {
   const title = str(d.title) || "Sem título";
@@ -478,6 +485,8 @@ function wake() {
 function openPlayer() {
   $("perr").classList.remove("on");
   player.classList.add("open");
+  watchLoading();
+  if (video.error) perr("Não foi possível carregar o vídeo. Confira o nome ou o link em \"filme\" no JSON.");
   document.documentElement.style.overflow = "hidden";
   try {
     const p = player.requestFullscreen ? player.requestFullscreen() : (player.webkitRequestFullscreen && player.webkitRequestFullscreen());
@@ -507,8 +516,41 @@ $("close").addEventListener("click", closePlayer);
 ["mousemove", "pointerdown", "touchstart"].forEach((ev) => player.addEventListener(ev, wake, { passive: true }));
 video.addEventListener("pause", wake);
 video.addEventListener("play", wake);
-video.addEventListener("error", () => { if (isOpen()) { $("perr").classList.add("on"); player.classList.remove("idle"); } });
+/* timeout do vídeo: se ficar travado carregando por mais de 20s, avisa em vez de girar para sempre */
+const VIDEO_TIMEOUT_MS = 20000;
+let loadTimer = null;
+function perr(msg) {
+  $("perrMsg").textContent = msg;
+  $("perr").classList.add("on");
+  player.classList.remove("idle");
+}
+function watchLoading() {
+  clearTimeout(loadTimer);
+  if (video.readyState >= 3) return;
+  loadTimer = setTimeout(() => {
+    if (isOpen() && video.readyState < 3) perr("O vídeo está demorando demais para carregar. Verifique a conexão ou o link em \"filme\" no JSON.");
+  }, VIDEO_TIMEOUT_MS);
+}
+["waiting", "stalled", "loadstart"].forEach((ev) => video.addEventListener(ev, () => { if (isOpen()) watchLoading(); }));
+["playing", "canplay"].forEach((ev) => video.addEventListener(ev, () => { clearTimeout(loadTimer); $("perr").classList.remove("on"); }));
+video.addEventListener("error", () => { if (isOpen()) perr("Não foi possível carregar o vídeo. Confira o nome ou o link em \"filme\" no JSON."); });
 
 document.addEventListener("keydown", (e) => {
   if (!isOpen()) return;
-  const 
+  const k = e.key;
+  const handled = () => { e.preventDefault(); e.stopPropagation(); wake(); };
+  if (k === "Escape") { handled(); closePlayer(); }
+  else if (k === " " || k === "k" || k === "K") { handled(); video.paused ? video.play().catch(() => {}) : video.pause(); }
+  else if (k === "ArrowRight") { handled(); video.currentTime = Math.min(video.duration || Infinity, video.currentTime + 5); }
+  else if (k === "ArrowLeft") { handled(); video.currentTime = Math.max(0, video.currentTime - 5); }
+  else if (k === "f" || k === "F") {
+    handled();
+    if (fsElement()) document.exitFullscreen && document.exitFullscreen().catch(() => {});
+    else player.requestFullscreen && player.requestFullscreen().catch(() => {});
+  }
+}, true);
+
+init();
+</script>
+</body>
+</html>
